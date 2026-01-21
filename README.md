@@ -100,7 +100,7 @@ Registra entrada/salida con GPS y QR.
 ```json
 {
   "uuid_dispositivo": "uuid-123",
-  "coordenadas": {"latitude": -32.9387, "longitude": -60.6611},
+  "coordenadas": {"latitude": -32.921, "longitude": -60.74034},
   "qr_data": "MAGNANI_ASISTENCIA_V1",
   "tipo": "entrada"
 }
@@ -118,7 +118,7 @@ Obtiene estadísticas (requiere `x-admin-token`).
 5. **Registro Guardado**: Si todo es válido, se guarda en Firebase
 
 ## Centro de Geofencing
-- **Ubicación**: -32.9387, -60.6611 (Rosario, Argentina)
+- **Ubicación**: -32.921, -60.74034 (Rosario, Argentina)
 - **Radio**: 100 metros
 - **Rechazo**: Registros fuera del rango son rechazados
 
