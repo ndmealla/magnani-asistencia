@@ -522,3 +522,29 @@ window.showNotification = function(message, type = 'info') {
 };
 
 console.log('Enhanced error handling and notification system loaded');
+
+/**
+ * DEVICE BINDING VALIDATION - Frontend
+ * Valida que el dispositivo del usuario sea el correcto
+ */
+
+// Guardar Device UUID del dispositivo actual
+function validateDeviceConsistency() {
+  const currentDeviceUUID = deviceUUID;
+  const storedDeviceUUID = localStorage.getItem('registeredDeviceUUID');
+  
+  if (!storedDeviceUUID) {
+    localStorage.setItem('registeredDeviceUUID', currentDeviceUUID);
+    return true;
+  }
+  
+  if (storedDeviceUUID !== currentDeviceUUID) {
+    const message = '!!! ALERTA DE SEGURIDAD !!!\n\nEste dispositivo NO es el registrado.\nContacta con administrador';
+    showNotification(message, 'warning');
+    return false;
+  }
+  
+  return true;
+}
+
+console.log('Device binding security loaded - Frontend validation enabled');
