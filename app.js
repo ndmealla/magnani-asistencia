@@ -1,6 +1,6 @@
 // Configuration
 const CONFIG = {
-    GEOFENCE_CENTER: { lat: -32.9387, lng: -60.6611 },
+    GEOFENCE_CENTER: { lat: -32.9198, lng: --60.7068 },
     GEOFENCE_RADIUS: 100, // meters
     API_BASE_URL: 'http://localhost:3000/api',
 };
