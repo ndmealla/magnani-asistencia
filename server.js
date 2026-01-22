@@ -508,3 +508,219 @@ app.post('/api/auth/register', rateLimiter(10, 60 * 60 * 1000), async (req, res)
 });
 
 console.log('Security enhancements loaded - Input validation, rate limiting, and data sanitization enabled');
+
+/**
+ * DEVICE BINDING SECURITY
+ * Valida que cada empleado solo marque asistencia desde su dispositivo asignado
+ */
+
+/**
+ * Validar si el dispositivo pertenece al usuario
+ * @param {string} userId 
+ * @param {string} currentDeviceUUID 
+ * @returns {Promise<boolean>}
+ */
+async function validateDeviceBinding(userId, currentDeviceUUID) {
+  try {
+    const userSnapshot = await db.ref(`users/${userId}`).once('value');
+    const userData = userSnapshot.val();
+    
+    if (!userData) {
+      return false;
+    }
+    
+    // Validar que el dispositivo coincida con el registrado
+    return userData.deviceUUID === currentDeviceUUID;
+  } catch (error) {
+    console.error('Device validation error:', error);
+    return false;
+  }
+}
+
+/**
+ * Middleware para validar dispositivo
+ */
+const verifyDeviceBinding = async (req, res, next) => {
+  try {
+    const { uid } = req.user;
+    const { deviceUUID } = req.body;
+    
+    if (!deviceUUID) {
+      return res.status(400).json({ error: 'Device UUID required' });
+    }
+    
+    const isValidDevice = await validateDeviceBinding(uid, deviceUUID);
+    
+    if (!isValidDevice) {
+      return res.status(403).json({ 
+        error: 'Device mismatch - Esta asistencia debe ser marcada desde tu dispositivo registrado. Contacta al administrador si cambiaste de móvil.' 
+      });
+    }
+    
+    next();
+  } catch (error) {
+    console.error('Device binding verification error:', error);
+    res.status(500).json({ error: 'Device verification failed' });
+  }
+};
+
+/**
+ * Endpoint para administrador: Cambiar dispositivo asignado a un empleado
+ * POST /api/admin/change-device/:userId
+ */
+app.post('/api/admin/change-device/:userId', verifyToken, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { newDeviceUUID } = req.body;
+    const { uid } = req.user;
+    
+    // Validar que solo administradores puedan hacer esto
+    const adminSnapshot = await db.ref(`users/${uid}/role`).once('value');
+    const userRole = adminSnapshot.val();
+    
+    if (userRole !== 'admin') {
+      return res.status(403).json({ error: 'Solo administradores pueden cambiar dispositivos' });
+    }
+    
+    if (!newDeviceUUID) {
+      return res.status(400).json({ error: 'New device UUID required' });
+    }
+    
+    if (!DataValidator.isValidUUID(newDeviceUUID)) {
+      return res.status(400).json({ error: 'Invalid device UUID format' });
+    }
+    
+    // Obtener datos del usuario
+    const userSnapshot = await db.ref(`users/${userId}`).once('value');
+    const userData = userSnapshot.val();
+    
+    if (!userData) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+    
+    const oldDeviceUUID = userData.deviceUUID;
+    
+    // Actualizar dispositivo
+    await db.ref(`users/${userId}`).update({
+      deviceUUID: newDeviceUUID,
+      deviceChangedAt: new Date().toISOString(),
+      deviceChangedBy: uid
+    });
+    
+    // Registrar cambio en auditoría
+    await db.ref(`audit/device-changes/${userId}`).push({
+      timestamp: new Date().toISOString(),
+      oldDeviceUUID,
+      newDeviceUUID,
+      changedBy: uid,
+      adminName: req.user.email
+    });
+    
+    res.json({ 
+      message: 'Dispositivo actualizado exitosamente',
+      user: userData.name,
+      oldDevice: oldDeviceUUID,
+      newDevice: newDeviceUUID,
+      changedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Device change error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Endpoint para obtener historial de cambios de dispositivo
+ * GET /api/admin/device-history/:userId
+ */
+app.get('/api/admin/device-history/:userId', verifyToken, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { uid } = req.user;
+    
+    // Validar que solo administradores puedan ver esto
+    const adminSnapshot = await db.ref(`users/${uid}/role`).once('value');
+    const userRole = adminSnapshot.val();
+    
+    if (userRole !== 'admin') {
+      return res.status(403).json({ error: 'Solo administradores pueden ver este historial' });
+    }
+    
+    const snapshot = await db.ref(`audit/device-changes/${userId}`).once('value');
+    const history = snapshot.val() || {};
+    const historyArray = Object.entries(history).map(([key, value]) => ({ id: key, ...value }));
+    
+    res.json({ 
+      userId,
+      deviceChangeHistory: historyArray.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+    });
+  } catch (error) {
+    console.error('Device history error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Aplicar validación de dispositivo a endpoints de asistencia
+app.post('/api/attendance/check-in', verifyToken, verifyDeviceBinding, async (req, res) => {
+  try {
+    const { location, deviceUUID } = req.body;
+    const { uid } = req.user;
+    
+    // Validar geofence
+    if (!isWithinGeofence(location.lat, location.lng)) {
+      return res.status(400).json({ error: 'Outside geofence radius' });
+    }
+    
+    const today = new Date().toISOString().split('T')[0];
+    const timestamp = new Date().toISOString();
+    const attendanceRecord = {
+      type: 'check-in',
+      timestamp,
+      location,
+      deviceUUID,
+      verified: true
+    };
+    
+    await db.ref(`attendance/${uid}/${today}`).push(attendanceRecord);
+    res.json({ 
+      message: 'Check-in recorded',
+      record: attendanceRecord
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/attendance/check-out', verifyToken, verifyDeviceBinding, async (req, res) => {
+  try {
+    const { location, deviceUUID } = req.body;
+    const { uid } = req.user;
+    
+    // Validar geofence
+    if (!isWithinGeofence(location.lat, location.lng)) {
+      return res.status(400).json({ error: 'Outside geofence radius' });
+    }
+    
+    const today = new Date().toISOString().split('T')[0];
+    const timestamp = new Date().toISOString();
+    const attendanceRecord = {
+      type: 'check-out',
+      timestamp,
+      location,
+      deviceUUID,
+      verified: true
+    };
+    
+    await db.ref(`attendance/${uid}/${today}`).push(attendanceRecord);
+    res.json({ 
+      message: 'Check-out recorded',
+      record: attendanceRecord
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+console.log('Device binding security initialized - Device validation enabled for attendance');
