@@ -332,3 +332,193 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Helper function for toggling views
 window.toggleView = toggleView;
+
+
+// ==========================================
+// NOTIFICATION SYSTEM - Enhanced Error Handling
+// ==========================================
+
+/**
+ * Notification System
+ * Proporciona notificaciones visuales y audibles para eventos de asistencia
+ */
+class NotificationSystem {
+    constructor() {
+        this.notificationContainer = null;
+        this.init();
+    }
+    
+    init() {
+        // Crear contenedor de notificaciones si no existe
+        if (!document.getElementById('notificationContainer')) {
+            const container = document.createElement('div');
+            container.id = 'notificationContainer';
+            container.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                z-index: 9999;
+                max-width: 400px;
+            `;
+            document.body.appendChild(container);
+            this.notificationContainer = container;
+        } else {
+            this.notificationContainer = document.getElementById('notificationContainer');
+        }
+    }
+    
+    /**
+     * Mostrar notificación con estilos
+     * @param {string} message - Mensaje a mostrar
+     * @param {string} type - success, error, warning, info
+     * @param {number} duration - Duración en ms (0 = permanente)
+     */
+    show(message, type = 'info', duration = 3000) {
+        const notification = document.createElement('div');
+        const colors = {
+            success: '#10b981',
+            error: '#ef4444',
+            warning: '#f59e0b',
+            info: '#3b82f6'
+        };
+        
+        const icons = {
+            success: '✅',
+            error: '❌',
+            warning: '⚠️',
+            info: 'ℹ️'
+        };
+        
+        notification.style.cssText = `
+            background-color: ${colors[type] || colors.info};
+            color: white;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            animation: slideIn 0.3s ease-in-out;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        `;
+        
+        notification.innerHTML = `
+            <span style="font-size: 20px;">${icons[type]}</span>
+            <span>${message}</span>
+        `;
+        
+        this.notificationContainer.appendChild(notification);
+        
+        if (duration > 0) {
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s ease-in-out';
+                setTimeout(() => notification.remove(), 300);
+            }, duration);
+        }
+    }
+}
+
+// Inicializar sistema de notificaciones
+const notificationSystem = new NotificationSystem();
+
+// ==========================================
+// ERROR HANDLER - Manejo centralizado de errores
+// ==========================================
+
+/**
+ * Manejador centralizado de errores
+ */
+class ErrorHandler {
+    static handle(error, context = '') {
+        console.error(`[${context}]`, error);
+        
+        let message = 'Ocurrió un error desconocido';
+        
+        if (error instanceof TypeError) {
+            message = 'Error de tipo: ' + error.message;
+        } else if (error instanceof ReferenceError) {
+            message = 'Referencia invalida: ' + error.message;
+        } else if (error instanceof SyntaxError) {
+            message = 'Error de sintaxis: ' + error.message;
+        } else if (error.message) {
+            message = error.message;
+        }
+        
+        notificationSystem.show(message, 'error', 5000);
+        return false;
+    }
+}
+
+// Agregar estilos para animaciones
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes slideIn {
+        from {
+            transform: translateX(400px);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+    
+    @keyframes slideOut {
+        from {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        to {
+            transform: translateX(400px);
+            opacity: 0;
+        }
+    }
+`;
+document.head.appendChild(style);
+
+// Envolver funciones existentes con manejo de errores
+const originalCheckIn = checkIn;
+window.checkIn = function() {
+    try {
+        return originalCheckIn.apply(this, arguments);
+    } catch (error) {
+        ErrorHandler.handle(error, 'checkIn');
+    }
+};
+
+const originalCheckOut = checkOut;
+window.checkOut = function() {
+    try {
+        return originalCheckOut.apply(this, arguments);
+    } catch (error) {
+        ErrorHandler.handle(error, 'checkOut');
+    }
+};
+
+const originalHandleLogin = handleLogin;
+window.handleLogin = function(event) {
+    try {
+        return originalHandleLogin.apply(this, arguments);
+    } catch (error) {
+        ErrorHandler.handle(error, 'handleLogin');
+    }
+};
+
+const originalHandleRegister = handleRegister;
+window.handleRegister = function(event) {
+    try {
+        return originalHandleRegister.apply(this, arguments);
+    } catch (error) {
+        ErrorHandler.handle(error, 'handleRegister');
+    }
+};
+
+// Mejorar notificaciones existentes
+const originalCheckInAlert = window.alert;
+
+// Interceptar alerts para convertirlos en notificaciones
+window.showNotification = function(message, type = 'info') {
+    notificationSystem.show(message, type);
+};
+
+console.log('Enhanced error handling and notification system loaded');
