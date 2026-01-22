@@ -298,3 +298,213 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Magnani Asistencia server running on port ${PORT}`);
 });
+
+
+// ==========================================
+// SECURITY ENHANCEMENTS
+// ==========================================
+
+/**
+ * Validador de datos
+ */
+const DataValidator = {
+    /**
+     * Validar UUID v4
+     * @param {string} uuid 
+     * @returns {boolean}
+     */
+    isValidUUID(uuid) {
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        return uuidRegex.test(uuid);
+    },
+    
+    /**
+     * Validar coordenadas GPS
+     * @param {number} lat 
+     * @param {number} lng 
+     * @returns {boolean}
+     */
+    isValidGPSCoordinates(lat, lng) {
+        return typeof lat === 'number' && typeof lng === 'number' &&
+               lat >= -90 && lat <= 90 &&
+               lng >= -180 && lng <= 180;
+    },
+    
+    /**
+     * Validar email
+     * @param {string} email 
+     * @returns {boolean}
+     */
+    isValidEmail(email) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return emailRegex.test(email);
+    },
+    
+    /**
+     * Validar fortaleza de contraseña
+     * @param {string} password 
+     * @returns {object}
+     */
+    validatePassword(password) {
+        const requirements = {
+            minLength: password.length >= 8,
+            hasUpperCase: /[A-Z]/.test(password),
+            hasLowerCase: /[a-z]/.test(password),
+            hasNumbers: /\d/.test(password),
+            hasSpecialChars: /[!@#$%^&*]/.test(password)
+        };
+        
+        const score = Object.values(requirements).filter(v => v).length;
+        return {
+            isStrong: score >= 4,
+            score,
+            requirements
+        };
+    }
+};
+
+/**
+ * Rate Limiting
+ */
+const rateLimitStore = new Map();
+
+const rateLimiter = (maxRequests = 100, windowMs = 15 * 60 * 1000) => {
+    return (req, res, next) => {
+        const ip = req.ip || req.connection.remoteAddress;
+        const now = Date.now();
+        
+        if (!rateLimitStore.has(ip)) {
+            rateLimitStore.set(ip, []);
+        }
+        
+        const requests = rateLimitStore.get(ip).filter(time => now - time < windowMs);
+        
+        if (requests.length >= maxRequests) {
+            return res.status(429).json({ error: 'Too many requests, please try again later.' });
+        }
+        
+        requests.push(now);
+        rateLimitStore.set(ip, requests);
+        next();
+    };
+};
+
+/**
+ * Input Sanitization
+ */
+const sanitizeInput = (data) => {
+    if (typeof data !== 'string') return data;
+    
+    return data
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#x27;')
+        .trim();
+};
+
+// Aplicar rate limiting a endpoints sensibles
+app.post('/api/auth/login', rateLimiter(5, 15 * 60 * 1000), async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        
+        // Validaciones
+        if (!email || !password) {
+            return res.status(400).json({ error: 'Email and password required' });
+        }
+        
+        if (!DataValidator.isValidEmail(email)) {
+            return res.status(400).json({ error: 'Invalid email format' });
+        }
+        
+        // Sanitizar entrada
+        const sanitizedEmail = sanitizeInput(email);
+        
+        // Obtener usuario
+        const userRecord = await auth.getUserByEmail(sanitizedEmail);
+        
+        const token = jwt.sign(
+            { uid: userRecord.uid, email: sanitizedEmail },
+            JWT_SECRET,
+            { expiresIn: '7d' }
+        );
+        
+        const snapshot = await db.ref(`users/${userRecord.uid}`).once('value');
+        const userData = snapshot.val();
+        
+        res.json({ 
+            message: 'Login successful',
+            token,
+            user: userData
+        });
+    } catch (error) {
+        console.error('Login error:', error);
+        res.status(401).json({ error: 'Invalid credentials' });
+    }
+});
+
+// Aplicar rate limiting a registro
+app.post('/api/auth/register', rateLimiter(10, 60 * 60 * 1000), async (req, res) => {
+    try {
+        const { email, password, name, department, deviceUUID } = req.body;
+        
+        // Validaciones
+        if (!email || !password || !name || !department) {
+            return res.status(400).json({ error: 'Missing required fields' });
+        }
+        
+        if (!DataValidator.isValidEmail(email)) {
+            return res.status(400).json({ error: 'Invalid email format' });
+        }
+        
+        const passwordValidation = DataValidator.validatePassword(password);
+        if (!passwordValidation.isStrong) {
+            return res.status(400).json({ 
+                error: 'Password is too weak. Must contain uppercase, lowercase, numbers, and special characters.',
+                requirements: passwordValidation.requirements
+            });
+        }
+        
+        if (!DataValidator.isValidUUID(deviceUUID)) {
+            return res.status(400).json({ error: 'Invalid device UUID' });
+        }
+        
+        // Sanitizar entradas
+        const sanitizedEmail = sanitizeInput(email);
+        const sanitizedName = sanitizeInput(name);
+        
+        const hashedPassword = await bcrypt.hash(password, 10);
+        
+        const userRecord = await auth.createUser({
+            email: sanitizedEmail,
+            password,
+            displayName: sanitizedName
+        });
+        
+        await db.ref(`users/${userRecord.uid}`).set({
+            email: sanitizedEmail,
+            name: sanitizedName,
+            department,
+            deviceUUID,
+            registeredAt: new Date().toISOString(),
+            uid: userRecord.uid
+        });
+        
+        const token = jwt.sign(
+            { uid: userRecord.uid, email: sanitizedEmail },
+            JWT_SECRET,
+            { expiresIn: '7d' }
+        );
+        
+        res.json({ 
+            message: 'User registered successfully',
+            token,
+            user: { uid: userRecord.uid, email: sanitizedEmail, name: sanitizedName, department }
+        });
+    } catch (error) {
+        console.error('Registration error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+console.log('Security enhancements loaded - Input validation, rate limiting, and data sanitization enabled');
