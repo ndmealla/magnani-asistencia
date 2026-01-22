@@ -25,7 +25,7 @@ const auth = admin.auth();
 
 // Constants
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
-const GEOFENCE_CENTER = { lat: -32.9387, lng: -60.6611 };
+const GEOFENCE_CENTER = { lat: -32.91989387, lng: -60.7068 };
 const GEOFENCE_RADIUS = 100; // meters
 
 // Utility Functions
