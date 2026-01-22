@@ -724,3 +724,86 @@ app.post('/api/attendance/check-out', verifyToken, verifyDeviceBinding, async (r
 });
 
 console.log('Device binding security initialized - Device validation enabled for attendance');
+
+
+// Comprehensive Error Logging and Global Error Handlers
+
+// Handle global unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('\n[UNHANDLED REJECTION] at:', promise, 'reason:', reason);
+    console.error('Stack trace:', reason instanceof Error ? reason.stack : reason);
+});
+
+// Handle global uncaught exceptions
+process.on('uncaughtException', (error) => {
+    console.error('\n[UNCAUGHT EXCEPTION]:', error);
+    console.error('Stack trace:', error.stack);
+    console.error('The application will exit to prevent unstable state.');
+    process.exit(1);
+});
+
+// Server initialization and startup
+const PORT = process.env.PORT || 3000;
+const HOST = '0.0.0.0'; // Listen on all interfaces
+
+app.listen(PORT, HOST, () => {
+    console.log('\n' + '='.repeat(60));
+    console.log('Magnani Asistencia - Servidor iniciado exitosamente');
+    console.log('='.repeat(60));
+    console.log('[INFO] Puerto: ' + PORT);
+    console.log('[INFO] Acceso local: http://localhost:' + PORT);
+    console.log('[INFO] Acceso en red: http://192.168.11.127:' + PORT);
+    console.log('[INFO] Geofencing: Habilitado - Centro en Rosario');
+    console.log('[INFO] Validación de dispositivo: Habilitada');
+    console.log('[INFO] Timestamp servidor: ' + new Date().toISOString());
+    console.log('='.repeat(60));
+    console.log('\nServidor escuchando en puerto ' + PORT);
+    console.log('Presiona Ctrl+C para detener el servidor\n');
+});
+
+// Handle server errors
+const server = app.listen ? app._server : null;
+if (app._server) {
+    app._server.on('error', (err) => {
+        if (err.code === 'EADDRINUSE') {
+            console.error('\n[ERROR] Puerto ' + PORT + ' ya está en uso.');
+            console.error('[INFO] Intenta cambiar el puerto o cierra la otra aplicación.');
+        } else if (err.code === 'EACCES') {
+            console.error('\n[ERROR] Permiso denegado para usar puerto ' + PORT);
+            console.error('[INFO] Intenta usar un puerto mayor a 1024.');
+        } else {
+            console.error('[ERROR] Error del servidor:', err);
+        }
+        process.exit(1);
+    });
+}
+
+// Graceful shutdown handler
+process.on('SIGINT', () => {
+    console.log('\n[INFO] Señal de interrupción recibida (Ctrl+C)');
+    console.log('[INFO] Cerrando servidor gracefully...');
+    
+    if (app._server) {
+        app._server.close(() => {
+            console.log('[INFO] Servidor cerrado correctamente');
+            console.log('[INFO] Desconectando de la base de datos...');
+            process.exit(0);
+        });
+        
+        // Timeout para force close
+        setTimeout(() => {
+            console.error('[ERROR] No se pudo cerrar el servidor en 10 segundos, forzando cierre...');
+            process.exit(1);
+        }, 10000);
+    } else {
+        process.exit(0);
+    }
+});
+
+// Log initialization
+console.log('[DEBUG] Variables de entorno cargadas');
+console.log('[DEBUG] Middleware de CORS configurado');
+console.log('[DEBUG] Rutas de API registradas');
+console.log('[DEBUG] Sistema de autenticación activo');
+console.log('[DEBUG] Sistema de geofencing activo');
+console.log('[DEBUG] Sistema de vinculación de dispositivos activo\n');
