@@ -152,6 +152,127 @@ Obtiene estadísticas (requiere `x-admin-token`).
 - [ ] Biometría (huella dactilar en mobile)
 - [ ] Análisis de asistencia (reportes AI)
 - [ ] App nativa con React Native
+- [ ] 
+## Plan de Desarrollo Detallado
+
+### Fase 1: Mejoras de Autenticación y Seguridad (Semana 1-2)
+**Estado: EN PROGRESO**
+
+- [ ] Integrar Firebase Auth v9+ en el frontend
+  - Implementar método de registro con validación de email
+  - Implementar login con persistencia de sesión
+  - Agregar recuperación de contraseña
+  - Integrar autenticación de factores múltiples (MFA)
+
+- [ ] Mejorar validación en el backend
+  - Validar UUIDs de dispositivo
+  - Implementar rate limiting en endpoints
+  - Agregar validación de integridad de datos
+  - Implementar cifrado de datos sensibles
+
+### Fase 2: Sistema de Notificaciones en Tiempo Real (Semana 2-3)
+**Estado: PENDIENTE**
+
+- [ ] Implementar Socket.io para notificaciones
+  - Notificaciones de entrada/salida exitosa
+  - Alertas de geofencing (entrada fuera de rango)
+  - Notificaciones de admin en tiempo real
+  - Sistema de push notifications para mobile
+
+- [ ] Agregar sistema de alertas
+  - Alertas cuando el usuario llega fuera de horas
+  - Alertas de inactividad
+  - Notificaciones de cambios de políticas
+
+### Fase 3: Dashboard Admin Mejorado (Semana 3-4)
+**Estado: PENDIENTE**
+
+- [ ] Expandir funcionalidades del admin
+  - Vista de mapa con ubicaciones de empleados en tiempo real
+  - Gráficos de asistencia por departamento
+  - Reportes avanzados (CSV, PDF)
+  - Gestión de empleados (crear, editar, desactivar)
+  - Control de permisos y roles
+  - Auditoría de actividades
+
+- [ ] Mejorar interfaz
+  - Dashboard responsivo con Bootstrap
+  - Tabla de asistencia con filtros avanzados
+  - Exportación de datos mejorada
+
+### Fase 4: Biometría (Semana 4-5)
+**Estado: PENDIENTE**
+
+- [ ] Implementar autenticación biométrica
+  - WebAuthn API para huella dactilar/facial en web
+  - React Native Biometrics para app mobile
+  - Fallback a autenticación tradicional
+  - Almacenamiento seguro de datos biométricos
+
+### Fase 5: Análisis AI y Reportes (Semana 5-6)
+**Estado: PENDIENTE**
+
+- [ ] Análisis de asistencia con IA
+  - Identificar patrones de ausencias
+  - Predicción de ausentismo
+  - Análisis de puntualidad
+  - Recomendaciones automáticas
+
+- [ ] Generación de reportes
+  - Reportes mensuales/anuales
+  - Análisis por departamento
+  - Métricas de productividad
+  - Export a múltiples formatos
+
+### Fase 6: App Nativa React Native (Semana 6-8)
+**Estado: PENDIENTE**
+
+- [ ] Setup inicial
+  - Crear proyecto React Native
+  - Configurar navegación
+  - Integración con Firebase
+  - Configuración de push notifications
+
+- [ ] Funcionalidades principales
+  - QR scanning mejorado
+  - Geolocalización avanzada
+  - Biometría
+  - Modo offline
+  - Sincronización automática
+
+## Convenciones de Desarrollo
+
+### Git Workflow
+```
+main (production)
+├── develop (staging)
+│   ├── feature/firebase-auth
+│   ├── feature/notifications
+│   ├── feature/admin-dashboard
+│   └── feature/biometric
+└── hotfix branches (si es necesario)
+```
+
+### Estándares de Código
+- ESLint + Prettier para JavaScript
+- Comentarios JSDoc para funciones principales
+- Variables en camelCase
+- Funciones descriptivas
+- Manejo de errores con try/catch
+
+### Testing
+- Pruebas unitarias con Jest
+- Pruebas de integración
+- Pruebas E2E con Cypress
+- Cobertura mínima: 80%
+
+## Próximos Pasos
+
+1. Crear rama `develop` para desarrollo continuo
+2. Comenzar con Fase 1: Firebase Auth
+3. Establecer CI/CD con GitHub Actions
+4. Documentar cambios en cada commit
+5. Hacer code reviews antes de merge
 
 ## Licencia
 
